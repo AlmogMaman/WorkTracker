@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useClickOutside } from '../hooks/useClickOutside'
+//import { useClickOutside } from '../hooks/useClickOutside'
 import { useAppStore } from '../store/useAppStore'
 
 interface Props {

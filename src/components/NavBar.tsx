@@ -1,6 +1,6 @@
 import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
-import type { View } from '../types'
+//import type { View } from '../types'
 
 export function NavBar() {
   const t = useTranslation()
