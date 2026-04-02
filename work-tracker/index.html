@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA / mobile meta -->
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Work Tracker" />
+    <meta name="description" content="Track your daily work hours by project" />
+
+    <!--
+      Content Security Policy (meta fallback — authoritative headers are in vercel.json / _headers).
+      script-src: 'unsafe-inline' intentionally REMOVED. Both scripts are now external files.
+      style-src:  'unsafe-inline' is required for React's inline `style` prop (e.g. progress bar width).
+                  CSS injection risk is minimal: no auth forms, no sensitive input fields.
+      object-src: 'none'  — blocks Flash/plugin exploitation.
+      base-uri:   'self'  — prevents <base href> hijacking.
+      form-action:'self'  — blocks form-based data exfiltration.
+    -->
+    <meta http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        font-src 'self';
+        connect-src 'self';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        upgrade-insecure-requests;
+      " />
+
+    <!-- Icons & PWA manifest -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <title>Work Tracker</title>
+
+    <!-- Apply dark mode before first paint (synchronous, no defer) -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- Register service worker after page load (deferred, non-blocking) -->
+    <script src="/sw-register.js" defer></script>
+  </body>
+</html>

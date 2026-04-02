@@ -1,0 +1,19 @@
+{
+  "name": "Work Tracker",
+  "short_name": "Work Tracker",
+  "description": "Track your daily work hours by project",
+  "theme_color": "#2563eb",
+  "background_color": "#f9fafb",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
