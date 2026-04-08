@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
-import { formatDateLabel, formatDuration } from '../utils/time'
+import { formatDateLabel, formatDurationMinutes } from '../utils/time'
 
 interface Props {
   date: string
@@ -30,13 +30,13 @@ export function DailySummaryPanel({ date }: Props) {
 
     const pad = (s: string, n: number) => s.padEnd(n)
     for (const row of summary) {
-      lines.push(`${pad(row.project, 30)} ${formatDuration(row.minutes)}`)
+      lines.push(`${pad(row.project, 30)} ${formatDurationMinutes(row.minutes)}`)
     }
 
     lines.push('─'.repeat(42))
     const footer = met
-      ? `${pad(t.summary.total, 30)} ${formatDuration(totalMinutes)}  ✓`
-      : `${pad(t.summary.total, 30)} ${formatDuration(totalMinutes)}  ⚠ ${formatDuration(remaining)}`
+      ? `${pad(t.summary.total, 30)} ${formatDurationMinutes(totalMinutes)}  ✓`
+      : `${pad(t.summary.total, 30)} ${formatDurationMinutes(totalMinutes)}  ⚠ ${formatDurationMinutes(remaining)}`
     lines.push(footer)
 
     navigator.clipboard
@@ -93,7 +93,7 @@ export function DailySummaryPanel({ date }: Props) {
                         {row.project}
                       </td>
                       <td className="px-4 py-2.5 text-right rtl:text-left font-mono text-gray-600 dark:text-gray-400">
-                        {formatDuration(row.minutes)}
+                        {formatDurationMinutes(row.minutes)}
                       </td>
                     </tr>
                   ))}
@@ -102,7 +102,7 @@ export function DailySummaryPanel({ date }: Props) {
                   <tr className="bg-gray-50 dark:bg-gray-700/50">
                     <td className="px-4 py-2.5 font-bold text-gray-800 dark:text-gray-200">{t.summary.total}</td>
                     <td className="px-4 py-2.5 text-right rtl:text-left font-bold font-mono text-gray-800 dark:text-gray-200">
-                      {formatDuration(totalMinutes)}
+                      {formatDurationMinutes(totalMinutes)}
                     </td>
                   </tr>
                 </tfoot>
@@ -117,7 +117,7 @@ export function DailySummaryPanel({ date }: Props) {
                 >
                   {met
                     ? t.summary.targetMet(targetHours)
-                    : t.summary.targetMissing(formatDuration(remaining), targetHours)}
+                    : t.summary.targetMissing(formatDurationMinutes(remaining), targetHours)}
                 </span>
                 <button
                   onClick={copyToClipboard}

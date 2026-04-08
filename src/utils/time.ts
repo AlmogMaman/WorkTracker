@@ -59,15 +59,40 @@ export function formatMonthLabel(yearMonth: string, locale = 'en-US'): string {
   return d.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
 }
 
-/** Returns duration in minutes. Uses current time if endTime is null. */
-export function parseDurationMinutes(startTime: string, endTime: string | null): number {
-  const end = endTime ?? nowHHMM()
+/** Returns duration in seconds. Uses current time if endTime is null. */
+export function parseDurationSeconds(startTime: string, endTime: string | null): number {
+  const now = new Date()
   const [sh, sm] = startTime.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-  return eh * 60 + em - (sh * 60 + sm)
+  const startSec = sh * 3600 + sm * 60
+  let endSec: number
+  if (endTime) {
+    const [eh, em] = endTime.split(':').map(Number)
+    endSec = eh * 3600 + em * 60
+  } else {
+    endSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()
+  }
+  return Math.max(0, endSec - startSec)
 }
 
-export function formatDuration(totalMinutes: number): string {
+/** Returns duration in minutes (kept for backward compat with summaries). */
+export function parseDurationMinutes(startTime: string, endTime: string | null): number {
+  return Math.floor(parseDurationSeconds(startTime, endTime) / 60)
+}
+
+/** Format seconds as "Xh Ym Zs" for completed blocks. */
+export function formatDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return '0s'
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  if (h > 0 && m > 0) return `${h}h ${m}m ${String(s).padStart(2, '0')}s`
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`
+  return `${s}s`
+}
+
+/** Format minutes-only (for summaries where second precision isn't needed). */
+export function formatDurationMinutes(totalMinutes: number): string {
   if (totalMinutes <= 0) return '0m'
   const h = Math.floor(totalMinutes / 60)
   const m = totalMinutes % 60

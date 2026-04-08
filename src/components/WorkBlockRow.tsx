@@ -7,7 +7,7 @@ import {
   formatLiveDuration,
   isValidTime,
   liveElapsedSeconds,
-  parseDurationMinutes,
+  parseDurationSeconds,
 } from '../utils/time'
 import { ProjectAutocomplete } from './ProjectAutocomplete'
 
@@ -35,7 +35,7 @@ export function WorkBlockRow({ block, date, isOverlapping, autoFocus }: Props) {
 
   const duration = isRunning
     ? formatLiveDuration(liveElapsedSeconds(block.startTime, block.startTimestamp))
-    : formatDuration(parseDurationMinutes(block.startTime, block.endTime))
+    : formatDuration(parseDurationSeconds(block.startTime, block.endTime))
 
   const handleProjectChange = (project: string) => {
     updateBlock(date, block.id, { project })

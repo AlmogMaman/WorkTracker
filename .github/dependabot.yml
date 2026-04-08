@@ -1,0 +1,52 @@
+version: 2
+
+updates:
+  # Keep GitHub Actions pinned versions up to date.
+  # Dependabot opens PRs to bump action SHAs/tags when new releases are published.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Jerusalem
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "ci(deps)"
+    # Only allow minor/patch updates automatically; review major version bumps manually.
+    groups:
+      actions-minor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # Keep npm dependencies up to date.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Jerusalem
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: "chore(deps)"
+    # Group all non-major npm updates into a single PR to reduce noise.
+    groups:
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    # Never auto-update major versions — review breaking changes manually.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type { AppData, AppSettings, RangeTarget, Toast, View, WorkBlock } from '../types'
 import { loadData, sanitizeProjectName, saveData } from '../utils/storage'
-import { nowHHMM, parseDurationMinutes, todayStr } from '../utils/time'
+import { nowHHMM, parseDurationMinutes, parseDurationSeconds, todayStr } from '../utils/time'
 
 // ─── Debounced persist ────────────────────────────────────────────────────────
 
@@ -34,6 +34,7 @@ interface AppStore {
   getDayBlocks: (date: string) => WorkBlock[]
   getRunningBlock: () => { block: WorkBlock; date: string } | null
   getDayTotalMinutes: (date: string) => number
+  getDayTotalSeconds: (date: string) => number
   getDailySummary: (date: string) => { project: string; minutes: number }[]
   getMonthlySummary: (yearMonth: string) => { project: string; minutes: number }[]
   getMonthDayTotals: (yearMonth: string) => Record<string, number>
@@ -197,6 +198,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return blocks.reduce((sum, b) => {
       const mins = parseDurationMinutes(b.startTime, b.endTime)
       return sum + Math.max(0, mins)
+    }, 0)
+  },
+
+  getDayTotalSeconds: (date) => {
+    const blocks = get().getDayBlocks(date)
+    return blocks.reduce((sum, b) => {
+      const secs = parseDurationSeconds(b.startTime, b.endTime)
+      return sum + Math.max(0, secs)
     }, 0)
   },
 

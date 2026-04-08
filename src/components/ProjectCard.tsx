@@ -7,7 +7,7 @@ import {
   formatLiveDuration,
   isValidTime,
   liveElapsedSeconds,
-  parseDurationMinutes,
+  parseDurationSeconds,
 } from '../utils/time'
 
 interface Props {
@@ -19,6 +19,8 @@ export function ProjectCard({ project, date }: Props) {
   const t = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(project)
 
   // ── Reactive selectors (stable references) ──────────────────────────────────
   const rawDayBlocks = useAppStore((s) => s.data.days[date])
@@ -29,7 +31,17 @@ export function ProjectCard({ project, date }: Props) {
   const stopRunningBlock = useAppStore((s) => s.stopRunningBlock)
   const updateBlock = useAppStore((s) => s.updateBlock)
   const deleteBlock = useAppStore((s) => s.deleteBlock)
+  const renameProject = useAppStore((s) => s.renameProject)
   const addToast = useAppStore((s) => s.addToast)
+
+  const commitRename = () => {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== project) {
+      renameProject(project, trimmed)
+      addToast(t.settings.renamed(project, trimmed), 'success')
+    }
+    setEditingName(false)
+  }
 
   // Is this project's timer running right now?
   const runningBlock = blocks.find((b) => b.endTime === null) ?? null
@@ -50,17 +62,17 @@ export function ProjectCard({ project, date }: Props) {
   useInterval(() => setTick((t) => t + 1), isRunning ? 1_000 : null)
 
   // ── Totals ───────────────────────────────────────────────────────────────────
-  const completedMinutes = blocks
+  const completedSeconds = blocks
     .filter((b) => b.endTime !== null)
-    .reduce((sum, b) => sum + Math.max(0, parseDurationMinutes(b.startTime, b.endTime)), 0)
+    .reduce((sum, b) => sum + Math.max(0, parseDurationSeconds(b.startTime, b.endTime)), 0)
 
   const liveSeconds = isRunning
     ? liveElapsedSeconds(runningBlock!.startTime, runningBlock!.startTimestamp)
     : 0
 
   const totalDisplay = isRunning
-    ? formatLiveDuration(completedMinutes * 60 + liveSeconds)
-    : formatDuration(completedMinutes)
+    ? formatLiveDuration(completedSeconds + liveSeconds)
+    : formatDuration(completedSeconds)
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const handleStart = () => {
@@ -143,9 +155,28 @@ export function ProjectCard({ project, date }: Props) {
 
         {/* Project name + total */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate text-base">
-            {project}
-          </div>
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename()
+                if (e.key === 'Escape') { setNameValue(project); setEditingName(false) }
+              }}
+              className="w-full px-2 py-0.5 text-base font-semibold rounded border border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            />
+          ) : (
+            <div
+              className="font-semibold text-gray-900 dark:text-gray-100 truncate text-base cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 group/name"
+              onClick={() => { setNameValue(project); setEditingName(true) }}
+              title={t.settings.rename}
+            >
+              {project}
+              <span className="ml-1 text-xs text-gray-300 dark:text-gray-600 group-hover/name:text-blue-400 dark:group-hover/name:text-blue-500">✎</span>
+            </div>
+          )}
           <div className={`text-sm font-mono font-bold tabular-nums ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
             {totalDisplay || '0m'}
           </div>
@@ -219,7 +250,7 @@ export function ProjectCard({ project, date }: Props) {
             <p className="text-sm text-gray-400 dark:text-gray-500 py-1">{t.project.noBlocks}</p>
           ) : (
             sortedBlocks.map((block) => {
-              const blockMins = parseDurationMinutes(block.startTime, block.endTime)
+              const blockSecs = parseDurationSeconds(block.startTime, block.endTime)
               const blockIsRunning = block.endTime === null
               return (
                 <div
@@ -262,7 +293,7 @@ export function ProjectCard({ project, date }: Props) {
                   <span className={`text-xs font-mono flex-1 text-right rtl:text-left ${blockIsRunning ? 'text-blue-600 dark:text-blue-400 font-semibold tabular-nums' : 'text-gray-500 dark:text-gray-400'}`}>
                     {blockIsRunning
                       ? formatLiveDuration(liveElapsedSeconds(block.startTime, block.startTimestamp))
-                      : blockMins > 0 ? formatDuration(blockMins) : '—'}
+                      : blockSecs > 0 ? formatDuration(blockSecs) : '—'}
                   </span>
 
                   {/* Delete block */}

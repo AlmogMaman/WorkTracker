@@ -332,19 +332,6 @@ export function SettingsView() {
         </p>
       </Section>
 
-      {/* Keyboard shortcuts */}
-      <Section title={t.settings.shortcuts}>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {t.shortcuts.map(([key, desc]) => (
-            <div key={key} className="flex items-center gap-3">
-              <kbd className="px-2 py-1 text-xs font-mono rounded bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 shrink-0">
-                {key}
-              </kbd>
-              <span className="text-gray-600 dark:text-gray-400">{desc}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
     </div>
   )
 }

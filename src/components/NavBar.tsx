@@ -57,7 +57,7 @@ export function NavBar() {
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button
               onClick={goToday}
-              className="hidden sm:block text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-medium transition-colors"
+              className="text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-medium transition-colors"
             >
               {t.nav.today}
             </button>
@@ -83,11 +83,10 @@ export function NavBar() {
 
       {/* ── Bottom nav — mobile only ── */}
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 safe-bottom">
-        <div className="flex items-stretch h-16">
-          <BottomNavBtn active={view === 'day'} onClick={() => setView('day')} icon="📅" label={t.nav.day} />
-          <BottomNavBtn active={view === 'month'} onClick={() => setView('month')} icon="📆" label={t.nav.month} />
-          <BottomNavBtn active={false} onClick={goToday} icon="⬛" label={t.nav.today} />
-          <BottomNavBtn active={view === 'settings'} onClick={() => setView('settings')} icon="⚙️" label={t.nav.settings} />
+        <div className="flex items-stretch h-14">
+          <BottomNavBtn active={view === 'day'} onClick={() => setView('day')} label={t.nav.day} />
+          <BottomNavBtn active={view === 'month'} onClick={() => setView('month')} label={t.nav.month} />
+          <BottomNavBtn active={view === 'settings'} onClick={() => setView('settings')} label={t.nav.settings} />
         </div>
       </nav>
     </>
@@ -112,26 +111,23 @@ function NavBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 function BottomNavBtn({
   active,
   onClick,
-  icon,
   label,
 }: {
   active: boolean
   onClick: () => void
-  icon: string
   label: string
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
+      className={`flex-1 flex flex-col items-center justify-center text-sm font-medium transition-colors relative ${
         active
           ? 'text-blue-600 dark:text-blue-400'
           : 'text-gray-500 dark:text-gray-400'
       }`}
     >
-      <span className="text-xl leading-none">{icon}</span>
       <span>{label}</span>
-      {active && <span className="absolute bottom-0 w-8 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
+      {active && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
     </button>
   )
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
 import { useInterval } from '../hooks/useInterval'
-import { formatDuration } from '../utils/time'
+import { formatDuration, formatDurationMinutes } from '../utils/time'
 
 interface Props {
   date: string
@@ -11,6 +11,7 @@ interface Props {
 export function ProgressBar({ date }: Props) {
   const t = useTranslation()
   const getDayTotalMinutes = useAppStore((s) => s.getDayTotalMinutes)
+  const getDayTotalSeconds = useAppStore((s) => s.getDayTotalSeconds)
   const getTargetForDay = useAppStore((s) => s.getTargetForDay)
   const setDayTarget = useAppStore((s) => s.setDayTarget)
   const dayTargets = useAppStore((s) => s.data.dayTargets)
@@ -58,7 +59,7 @@ export function ProgressBar({ date }: Props) {
       <div className="flex items-center justify-between mb-2 gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {formatDuration(totalMinutes)}
+            {formatDuration(getDayTotalSeconds(date))}
           </span>
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-400 dark:text-gray-500">
@@ -95,7 +96,7 @@ export function ProgressBar({ date }: Props) {
           </span>
         ) : (
           <span className="text-sm font-semibold text-red-500 dark:text-red-400">
-            -{formatDuration(remaining)}
+            -{formatDurationMinutes(remaining)}
           </span>
         )}
       </div>

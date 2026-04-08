@@ -1,6 +1,6 @@
 import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
-import { formatDuration, formatMonthLabel } from '../utils/time'
+import { formatDurationMinutes, formatMonthLabel } from '../utils/time'
 
 interface Props {
   yearMonth: string
@@ -19,9 +19,9 @@ export function MonthSummaryTable({ yearMonth }: Props) {
     const lines: string[] = [
       t.month.monthlySummary(formatMonthLabel(yearMonth, t.locale)),
       '─'.repeat(44),
-      ...summary.map((r) => `${pad(r.project, 32)} ${formatDuration(r.minutes)}`),
+      ...summary.map((r) => `${pad(r.project, 32)} ${formatDurationMinutes(r.minutes)}`),
       '─'.repeat(44),
-      `${pad(t.month.total, 32)} ${formatDuration(totalMinutes)}`,
+      `${pad(t.month.total, 32)} ${formatDurationMinutes(totalMinutes)}`,
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -73,7 +73,7 @@ export function MonthSummaryTable({ yearMonth }: Props) {
                   {row.project}
                 </td>
                 <td className="px-4 py-2.5 text-right rtl:text-left font-mono text-gray-600 dark:text-gray-400">
-                  {formatDuration(row.minutes)}
+                  {formatDurationMinutes(row.minutes)}
                 </td>
               </tr>
             ))}
@@ -82,7 +82,7 @@ export function MonthSummaryTable({ yearMonth }: Props) {
             <tr className="bg-gray-50 dark:bg-gray-700/50">
               <td className="px-4 py-2.5 font-bold text-gray-800 dark:text-gray-200">{t.month.total}</td>
               <td className="px-4 py-2.5 text-right rtl:text-left font-bold font-mono text-gray-800 dark:text-gray-200">
-                {formatDuration(totalMinutes)}
+                {formatDurationMinutes(totalMinutes)}
               </td>
             </tr>
           </tfoot>

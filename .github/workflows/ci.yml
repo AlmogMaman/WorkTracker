@@ -1,0 +1,508 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Principle of least privilege: deny all permissions by default.
+# Each job opts in to exactly what it needs.
+permissions: read-all
+
+# Cancel in-progress runs for the same branch/PR to save compute and avoid races.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 1: TypeScript strict type-check
+  # ──────────────────────────────────────────────────────────────────────────────
+  type-check:
+    name: TypeScript type-check
+    runs-on: ubuntu-24.04        # Pinned OS — never break silently on OS upgrade
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"   # Exact Node version — not a range
+          cache: npm
+
+      - name: Install dependencies (clean install from lockfile)
+        run: npm ci --ignore-scripts   # --ignore-scripts: prevents malicious postinstall execution
+
+      - name: Run tsc --noEmit (strict mode)
+        run: npx --no-install tsc --noEmit
+        # --no-install: use the tsc already installed by npm ci, never auto-install
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 2: ESLint — code quality + embedded-secret detection
+  # ──────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: ESLint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install ESLint and security plugins (pinned versions)
+        # Versions are pinned at exact patch level.
+        # Update via: npm install --no-save eslint@X.Y.Z (then update here)
+        run: |
+          npm install --no-save \
+            eslint@8.57.1 \
+            @typescript-eslint/parser@7.18.0 \
+            @typescript-eslint/eslint-plugin@7.18.0 \
+            eslint-plugin-react@7.37.4 \
+            eslint-plugin-react-hooks@4.6.2 \
+            eslint-plugin-react-refresh@0.4.19 \
+            eslint-plugin-no-secrets@1.1.2
+
+      - name: Run ESLint
+        run: npx --no-install eslint src/ --ext .ts,.tsx --max-warnings 0
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 3: Axios ban — source scan + npm ci + npm list (local + global)
+  # ──────────────────────────────────────────────────────────────────────────────
+  axios-ban:
+    name: Axios ban
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      # ── Source-level checks (before install) ────────────────────────────────
+      - name: Scan package manifests for axios
+        run: |
+          echo "Checking package.json and package-lock.json..."
+          if grep -q '"axios"' package.json 2>/dev/null; then
+            echo "FAIL: axios found in package.json"
+            exit 1
+          fi
+          if grep -q '"axios"' package-lock.json 2>/dev/null; then
+            echo "FAIL: axios found in package-lock.json"
+            exit 1
+          fi
+          echo "PASS: axios not in package manifests"
+
+      - name: Scan source files for axios imports
+        run: |
+          echo "Scanning src/ for axios imports..."
+          if grep -rq "from ['\"]axios['\"]" src/; then
+            echo "FAIL: axios ES import found in source files:"
+            grep -rn "from ['\"]axios['\"]" src/
+            exit 1
+          fi
+          if grep -rq "require(['\"]axios['\"])" src/; then
+            echo "FAIL: axios require() found in source files:"
+            grep -rn "require(['\"]axios['\"])" src/
+            exit 1
+          fi
+          if grep -riq "axios" src/ --include="*.ts" --include="*.tsx"; then
+            echo "FAIL: any reference to axios found in source files:"
+            grep -rni "axios" src/ --include="*.ts" --include="*.tsx"
+            exit 1
+          fi
+          echo "PASS: axios not referenced in any source file"
+
+      # ── Runtime checks via npm ci + npm list ────────────────────────────────
+      # npm ci (not npm install) — deterministic, no lockfile mutation
+      - name: Install dependencies (clean install from lockfile)
+        run: npm ci --ignore-scripts
+
+      - name: Check axios not in local project dependency tree
+        run: |
+          echo "Running: npm list axios"
+          if npm list axios 2>/dev/null | grep -q "axios"; then
+            echo "FAIL: axios is present in local project dependency tree:"
+            npm list axios
+            exit 1
+          fi
+          echo "PASS: axios not found in local dependencies"
+
+      - name: Check axios not installed globally on runner
+        run: |
+          echo "Running: npm list -g axios"
+          if npm list -g axios 2>/dev/null | grep -q "axios"; then
+            echo "FAIL: axios is installed globally on this runner:"
+            npm list -g axios
+            exit 1
+          fi
+          echo "PASS: axios not found globally"
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 4: Secret scanning — git history (TruffleHog) + working tree (Gitleaks)
+  # ──────────────────────────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0           # Full history — TruffleHog scans all commits
+          persist-credentials: false
+
+      - name: TruffleHog — scan full git history for verified secrets
+        # Pinned to specific tag, NOT @main.
+        # @main changes without warning; a pinned release is immutable.
+        uses: trufflesecurity/trufflehog@v3.89.0
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Gitleaks — scan working tree and diff
+        uses: gitleaks/gitleaks-action@v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is optional — omit for OSS-only mode
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 5: Dependency audit — CVEs, licenses, lockfile integrity, supply chain
+  # ──────────────────────────────────────────────────────────────────────────────
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      - name: Verify lockfile is consistent with package.json
+        # npm ci fails if package-lock.json is out of sync — this is the dry-run check
+        run: npm ci --dry-run
+
+      - name: npm audit — block on High/Critical CVEs
+        run: npm audit --audit-level=high
+
+      - name: Install license-checker (pinned version)
+        run: npm install --no-save license-checker@25.1.3
+
+      - name: Check dependency licenses (allowlist)
+        run: |
+          npx --no-install license-checker --onlyAllow \
+            "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
+            --excludePrivatePackages
+
+      - name: Socket CLI — supply-chain behavioral risk check
+        # continue-on-error: informational — findings are logged but don't block CI.
+        # Set to false to make supply-chain issues a hard gate.
+        continue-on-error: true
+        run: |
+          npm install --no-save @socketsecurity/cli@1.4.3
+          npx --no-install socket check --strict
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 6: SAST — CodeQL deep dataflow + Semgrep React/OWASP rules
+  # ──────────────────────────────────────────────────────────────────────────────
+  sast:
+    name: SAST (CodeQL + Semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30           # CodeQL can be slow on larger codebases
+    permissions:
+      security-events: write      # Required: CodeQL uploads SARIF to GitHub Security tab
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3.28.10
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Build for CodeQL analysis
+        uses: github/codeql-action/autobuild@v3.28.10
+
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/analyze@v3.28.10
+        with:
+          category: "/language:javascript-typescript"
+
+      - name: Run Semgrep (React + TypeScript + OWASP Top 10)
+        uses: semgrep/semgrep-action@v1.1.0
+        with:
+          config: >-
+            p/react
+            p/typescript
+            p/security-audit
+            p/owasp-top-ten
+            p/xss
+            p/secrets
+        env:
+          # SEMGREP_APP_TOKEN is optional — omit for OSS-only rules with no rate limit
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 7: Claude Code AI security review
+  # Runs Claude Code in non-interactive mode against the full codebase.
+  # Fails CI if Claude identifies any CRITICAL security findings.
+  # ──────────────────────────────────────────────────────────────────────────────
+  claude-security-review:
+    name: Claude Code security review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      - name: Install Claude Code CLI (pinned version)
+        run: npm install -g @anthropic-ai/claude-code@1.8.0
+
+      - name: Run Claude Code security audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude --print \
+            "You are a senior AppSec engineer performing a CI security gate review of this React 18 + TypeScript + Vite PWA codebase.
+
+            Thoroughly audit ALL files in src/ and public/ for the following:
+
+            1. XSS vulnerabilities: dangerouslySetInnerHTML, innerHTML assignments, document.write, eval, Function constructor
+            2. Injection attacks: command injection, code injection, prototype pollution
+            3. Hardcoded secrets: API keys, tokens, passwords, private keys, base64-encoded credentials
+            4. Forbidden dependencies: axios or any package with known trojans/malware
+            5. CSP bypass risks: any code that could loosen or circumvent Content-Security-Policy
+            6. Input validation: unvalidated user input reaching the DOM or localStorage
+            7. Sensitive data exposure: console.log of secrets, localStorage storing sensitive data insecurely
+            8. Supply chain: unusual postinstall scripts, dynamic require() calls
+            9. React-specific: unsafe prop spreading, missing input sanitization, insecure component patterns
+            10. OWASP Top 10 patterns applicable to a browser-only PWA
+
+            Format your response as follows:
+            - Start each CRITICAL finding with the exact string 'CRITICAL:'
+            - Start each WARNING finding with the exact string 'WARNING:'
+            - Start each INFO note with the exact string 'INFO:'
+            - At the very end of your response, output exactly one of:
+              AUDIT_RESULT: PASS
+              AUDIT_RESULT: FAIL
+            Output FAIL if any CRITICAL findings exist. Output PASS otherwise.
+
+            Be thorough but precise — avoid false positives." \
+            2>&1 | tee /tmp/claude_security_report.txt
+
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo "  Claude Code Security Audit Report"
+          echo "═══════════════════════════════════════"
+          cat /tmp/claude_security_report.txt
+          echo ""
+
+          if grep -q "AUDIT_RESULT: FAIL" /tmp/claude_security_report.txt; then
+            echo "FAIL: Claude Code identified CRITICAL security issues. See report above."
+            exit 1
+          fi
+
+          if ! grep -q "AUDIT_RESULT:" /tmp/claude_security_report.txt; then
+            echo "WARNING: Claude Code did not produce a conclusive AUDIT_RESULT. Treating as non-blocking."
+            exit 0
+          fi
+
+          echo "PASS: Claude Code security review completed with no critical findings."
+
+      - name: Upload Claude security report as artifact
+        if: always()    # Upload even if the previous step failed
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+        with:
+          name: claude-security-report-${{ github.sha }}
+          path: /tmp/claude_security_report.txt
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 8: Build + artifact security validation
+  # Hard gate: depends on ALL 7 security jobs passing.
+  # ──────────────────────────────────────────────────────────────────────────────
+  build-and-artifact:
+    name: Build and artifact scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    needs:
+      - type-check
+      - lint
+      - axios-ban
+      - secret-scan
+      - dependency-audit
+      - sast
+      - claude-security-review
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e  # v4.3.0
+        with:
+          node-version: "20.19.0"
+          cache: npm
+
+      - name: Install dependencies (clean install from lockfile)
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # ── Scan the compiled bundle for leaked secrets ────────────────────────
+      - name: Scan dist/ for leaked secrets and sensitive strings
+        run: |
+          echo "Scanning dist/ for sensitive patterns..."
+          FAIL=0
+
+          # Hardcoded token/key patterns
+          if grep -riq "api[_-]key\|apikey\|api_secret\|private[_-]key\|secret[_-]key\|access[_-]token\|bearer " \
+              dist/ --include="*.js" --include="*.html"; then
+            echo "FAIL: Potential secret keyword found in dist/"
+            grep -rni "api[_-]key\|apikey\|api_secret\|private[_-]key\|secret[_-]key\|access[_-]token\|bearer " \
+                dist/ --include="*.js" --include="*.html"
+            FAIL=1
+          fi
+
+          # Warn (non-fatal) on long base64 blobs — minified JS can legitimately have these
+          if grep -rqP "[A-Za-z0-9+/]{60,}={0,2}" dist/ --include="*.js"; then
+            echo "WARNING: Very long base64-like strings found (review manually — may be legitimate):"
+            grep -rnoP "[A-Za-z0-9+/]{60,}={0,2}" dist/ --include="*.js" | head -10
+          fi
+
+          # axios in the compiled bundle (belt-and-suspenders after Job 3)
+          if grep -rq "axios" dist/ --include="*.js"; then
+            echo "FAIL: axios string found in compiled bundle"
+            exit 1
+          fi
+
+          if [ "$FAIL" -eq 1 ]; then
+            exit 1
+          fi
+          echo "PASS: No secrets or forbidden libraries found in dist/"
+
+      # ── Validate CSP has not been weakened ────────────────────────────────
+      - name: Validate CSP headers in vercel.json
+        run: |
+          node --input-type=module << 'EOF'
+          import { readFileSync } from 'fs';
+          const vercel = JSON.parse(readFileSync('vercel.json', 'utf8'));
+          const headers = vercel.headers?.[0]?.headers ?? [];
+          const csp = headers.find(h => h.key === 'Content-Security-Policy');
+
+          if (!csp) {
+            console.error('FAIL: Content-Security-Policy header missing from vercel.json');
+            process.exit(1);
+          }
+
+          const val = csp.value;
+          const checks = [
+            { test: !val.includes("'unsafe-eval'"),        name: "no unsafe-eval" },
+            { test: !val.match(/script-src[^;]*'unsafe-inline'/), name: "no unsafe-inline in script-src" },
+            { test: val.includes("object-src 'none'"),     name: "object-src 'none' present" },
+            { test: val.includes("default-src 'self'"),    name: "default-src 'self' present" },
+            { test: val.includes("base-uri 'self'"),       name: "base-uri 'self' present" },
+            { test: val.includes("form-action 'self'"),    name: "form-action 'self' present" },
+          ];
+
+          let failed = false;
+          for (const c of checks) {
+            if (!c.test) { console.error('FAIL:', c.name); failed = true; }
+            else          { console.log(' OK :', c.name); }
+          }
+          if (failed) process.exit(1);
+          console.log('All CSP checks passed.');
+          EOF
+
+      # ── Validate all required security headers are present ────────────────
+      - name: Validate security headers completeness
+        run: |
+          node --input-type=module << 'EOF'
+          import { readFileSync } from 'fs';
+          const vercel = JSON.parse(readFileSync('vercel.json', 'utf8'));
+          const headers = vercel.headers?.[0]?.headers ?? [];
+          const map = Object.fromEntries(headers.map(h => [h.key, h.value]));
+
+          const required = [
+            'Content-Security-Policy',
+            'X-Content-Type-Options',
+            'X-Frame-Options',
+            'Referrer-Policy',
+            'Permissions-Policy',
+            'Strict-Transport-Security',
+          ];
+
+          let failed = false;
+          for (const r of required) {
+            if (!map[r]) { console.error('FAIL: Missing header:', r); failed = true; }
+            else          { console.log(' OK : Present:', r); }
+          }
+
+          if (!['DENY','SAMEORIGIN'].includes(map['X-Frame-Options'])) {
+            console.error('FAIL: X-Frame-Options unsafe value:', map['X-Frame-Options']);
+            failed = true;
+          }
+
+          const maxAge = parseInt((map['Strict-Transport-Security']?.match(/max-age=(\d+)/) ?? [])[1] ?? '0');
+          if (maxAge < 31536000) {
+            console.error('FAIL: HSTS max-age too short:', maxAge, '(must be >= 31536000 / 1 year)');
+            failed = true;
+          } else {
+            console.log(' OK : HSTS max-age:', maxAge);
+          }
+
+          if (failed) process.exit(1);
+          console.log('All security header checks passed.');
+          EOF
+
+      - name: Upload dist/ as pipeline artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 3

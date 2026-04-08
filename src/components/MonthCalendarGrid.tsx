@@ -2,7 +2,7 @@ import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
 import {
   dateToStr,
-  formatDuration,
+  formatDurationMinutes,
   getDaysInMonth,
   getFirstDayOfWeek,
   isFuture,
@@ -106,7 +106,7 @@ export function MonthCalendarGrid({ yearMonth, onDayClick }: Props) {
               {/* Hours logged */}
               {hasData && (
                 <span className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 font-mono leading-none">
-                  {formatDuration(totalMins)}
+                  {formatDurationMinutes(totalMins)}
                 </span>
               )}
 
