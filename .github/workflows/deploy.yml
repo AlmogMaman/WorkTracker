@@ -31,7 +31,7 @@ jobs:
       # security risk (runs incoming code in the context of the target repo).
       # The job-level `if` already guarantees this only runs on main pushes,
       # so a plain checkout of the default branch (main) is correct and safe.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
