@@ -65,21 +65,14 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Pinned Vercel CLI version — avoids surprise breaking changes from npx latest
-          npm install --no-save vercel
+          npm install -g vercel
 
-          npx --no-install vercel pull \
+          # Single command: pull config + deploy the already-built dist/
+          # --yes answers all prompts automatically (fixes "no YES option" error)
+          # --archive=tgz bundles dist/ for upload without a separate build step
+          DEPLOY_URL=$(vercel deploy dist/ \
+            --prod \
             --yes \
-            --environment=production \
-            --token="$VERCEL_TOKEN"
-
-          npx --no-install vercel build \
-            --prod \
-            --token="$VERCEL_TOKEN"
-
-          DEPLOY_URL=$(npx --no-install vercel deploy \
-            --prebuilt \
-            --prod \
             --token="$VERCEL_TOKEN")
 
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
