@@ -38,7 +38,7 @@ export function WorkBlockList({ date }: Props) {
         <div className="py-16 flex flex-col items-center gap-3 text-gray-400 dark:text-gray-500">
           <span className="text-5xl">⏱</span>
           <p className="text-base font-medium">No time blocks yet</p>
-          <p className="text-sm">Click "+ Add Block" to start tracking</p>
+          <p className="text-sm">{'Click "+ Add Block" to start tracking'}</p>
         </div>
       ) : (
         blocks.map((block) => {
