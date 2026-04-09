@@ -226,12 +226,9 @@ jobs:
             "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
             --excludePrivatePackages
 
-      - name: Socket CLI — supply-chain behavioral risk check
-        continue-on-error: true   # informational — findings logged but don't block CI
-        run: |
-          npm install --no-save @socketsecurity/cli
-          # `socket ci` = scan create --report, exits with error if unhealthy
-          npx socket ci .
+      # Supply-chain risk is covered by: npm audit (CVEs), TruffleHog (secrets),
+      # CodeQL (dataflow), and Semgrep (OWASP). Socket CLI removed — requires
+      # a paid API token and provides no additional value for this project.
 
   # ──────────────────────────────────────────────────────────────────────────────
   # Job 6: SAST — CodeQL deep dataflow + Semgrep React/OWASP rules
