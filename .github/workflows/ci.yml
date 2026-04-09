@@ -230,7 +230,8 @@ jobs:
         continue-on-error: true   # informational — findings logged but don't block CI
         run: |
           npm install --no-save @socketsecurity/cli
-          npx socket check --strict
+          # `socket ci` = scan create --report, exits with error if unhealthy
+          npx socket ci .
 
   # ──────────────────────────────────────────────────────────────────────────────
   # Job 6: SAST — CodeQL deep dataflow + Semgrep React/OWASP rules
