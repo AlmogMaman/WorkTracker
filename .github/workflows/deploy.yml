@@ -27,9 +27,12 @@ jobs:
       name: production
       url: ${{ steps.deploy.outputs.url }}
     steps:
+      # Do NOT use workflow_run.head_sha as ref — that is a CodeQL-flagged
+      # security risk (runs incoming code in the context of the target repo).
+      # The job-level `if` already guarantees this only runs on main pushes,
+      # so a plain checkout of the default branch (main) is correct and safe.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v4

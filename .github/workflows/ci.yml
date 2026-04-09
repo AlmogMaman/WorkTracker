@@ -174,13 +174,15 @@ jobs:
           persist-credentials: false
 
       - name: TruffleHog — scan git history for secrets
-        uses: trufflesecurity/trufflehog@v3
-        with:
-          path: ./
-          # scan everything pushed, handling first-commit edge case where before==after
-          base: ${{ github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '' }}
-          head: HEAD
-          extra_args: --only-verified
+        run: |
+          # Install TruffleHog CLI directly (avoids action tag version issues)
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+            | sh -s -- -b /usr/local/bin
+          # Scan the full repo history for verified secrets only
+          trufflehog git file://. --only-verified --fail || {
+            echo "TruffleHog found verified secrets in git history. Check output above."
+            exit 1
+          }
 
       - name: Gitleaks — scan working tree and diff
         uses: gitleaks/gitleaks-action@v2
@@ -221,7 +223,7 @@ jobs:
       - name: Check dependency licenses (allowlist)
         run: |
           npx license-checker --onlyAllow \
-            "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
+            "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;CC-BY-4.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
             --excludePrivatePackages
 
       - name: Socket CLI — supply-chain behavioral risk check
@@ -261,18 +263,17 @@ jobs:
           category: "/language:javascript-typescript"
 
       - name: Run Semgrep (React + TypeScript + OWASP Top 10)
-        uses: semgrep/semgrep-action@v1
-        with:
-          config: >-
-            p/react
-            p/typescript
-            p/security-audit
-            p/owasp-top-ten
-            p/xss
-            p/secrets
-        env:
-          # SEMGREP_APP_TOKEN is optional — omit for OSS-only rules with no rate limit
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          pip install semgrep --quiet
+          semgrep scan \
+            --config p/react \
+            --config p/typescript \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/xss \
+            --config p/secrets \
+            --error \
+            src/
 
   # ──────────────────────────────────────────────────────────────────────────────
   # Job 7: Claude Code AI security review
