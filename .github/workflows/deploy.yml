@@ -64,16 +64,21 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Prevents npx from prompting when Vercel CLI internally calls npx vercel@<version>
+          NPM_CONFIG_YES: "true"
+          # Disable telemetry prompt
+          VERCEL_TELEMETRY_DISABLED: "1"
         run: |
           npm install -g vercel
 
-          # Single command: pull config + deploy the already-built dist/
-          # --yes answers all prompts automatically (fixes "no YES option" error)
-          # --archive=tgz bundles dist/ for upload without a separate build step
-          DEPLOY_URL=$(vercel deploy dist/ \
-            --prod \
-            --yes \
-            --token="$VERCEL_TOKEN")
+          # Step 1: pull project config and env vars from Vercel
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+          # Step 2: build locally into .vercel/output (the prebuilt format Vercel expects)
+          vercel build --prod --token="$VERCEL_TOKEN"
+
+          # Step 3: upload the prebuilt output — Vercel skips its own build entirely
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN")
 
           echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to: $DEPLOY_URL"
