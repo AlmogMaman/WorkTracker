@@ -306,54 +306,88 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           claude --print \
-            "You are a senior AppSec engineer performing a CI security gate review of this React 18 + TypeScript + Vite PWA codebase.
+            "You are a senior AppSec engineer performing a CI security gate review of this React 18 + TypeScript + Vite PWA (React 18, TypeScript, Vite 6, Zustand, Tailwind CSS, no backend).
 
-            Thoroughly audit ALL files in src/ and public/ for the following:
+            Read every file in src/ and public/ thoroughly. Then produce a complete security report structured EXACTLY as follows — do not deviate from this format, as the CI pipeline parses it:
 
-            1. XSS vulnerabilities: dangerouslySetInnerHTML, innerHTML assignments, document.write, eval, Function constructor
-            2. Injection attacks: command injection, code injection, prototype pollution
-            3. Hardcoded secrets: API keys, tokens, passwords, private keys, base64-encoded credentials
-            4. Forbidden dependencies: axios or any package with known trojans/malware
-            5. CSP bypass risks: any code that could loosen or circumvent Content-Security-Policy
-            6. Input validation: unvalidated user input reaching the DOM or localStorage
-            7. Sensitive data exposure: console.log of secrets, localStorage storing sensitive data insecurely
-            8. Supply chain: unusual postinstall scripts, dynamic require() calls
-            9. React-specific: unsafe prop spreading, missing input sanitization, insecure component patterns
-            10. OWASP Top 10 patterns applicable to a browser-only PWA
+            ---
+            ## Claude Code Security Audit Report
 
-            Format your response as follows:
-            - Start each CRITICAL finding with the exact string 'CRITICAL:'
-            - Start each WARNING finding with the exact string 'WARNING:'
-            - Start each INFO note with the exact string 'INFO:'
-            - At the very end of your response, output exactly one of:
-              AUDIT_RESULT: PASS
-              AUDIT_RESULT: FAIL
-            Output FAIL if any CRITICAL findings exist. Output PASS otherwise.
+            ### Summary
+            One paragraph: overall security posture, what was audited, verdict.
 
-            Be thorough but precise — avoid false positives." \
+            ### Critical Findings  (blocks deployment)
+            For each critical issue:
+            CRITICAL: [short title]
+            - File: <file path and line number>
+            - Issue: <precise description of the vulnerability>
+            - Risk: <what an attacker could do>
+            - Fix: <exact code change or remediation step required>
+
+            If none: write 'None found.'
+
+            ### Warnings  (should fix, does not block)
+            For each warning:
+            WARNING: [short title]
+            - File: <file path and line number>
+            - Issue: <description>
+            - Fix: <remediation>
+
+            If none: write 'None found.'
+
+            ### Informational Notes
+            INFO: [note] — one line each.
+
+            ### Remediation Checklist
+            A numbered markdown checklist of every action required to reach a clean audit,
+            ordered from highest to lowest priority. Include file:line references.
+            - [ ] 1. ...
+            - [ ] 2. ...
+
+            ---
+            AUDIT_RESULT: PASS
+            (or AUDIT_RESULT: FAIL if any CRITICAL findings exist)
+            ---
+
+            Audit scope — check ALL of the following:
+            1. XSS: dangerouslySetInnerHTML, innerHTML, document.write, eval, new Function()
+            2. Prototype pollution, __proto__, Object.assign on user input
+            3. Hardcoded secrets: API keys, tokens, passwords, private keys, base64 blobs
+            4. Forbidden packages: axios or any package with known supply-chain compromise
+            5. CSP weakening: any code that loosens or bypasses Content-Security-Policy
+            6. Unvalidated input reaching the DOM or localStorage without sanitization
+            7. Sensitive data in console.log, localStorage keys, or error messages
+            8. React-specific: unsafe prop spreading, missing key props in security contexts
+            9. OWASP Top 10 applicable to a browser-only PWA
+            10. Service worker attack surface: cache poisoning, scope misconfiguration
+            11. Clickjacking, open redirects, URL injection
+            12. Dependency confusion or typosquatting in import paths
+
+            Be thorough and precise. Include file paths and line numbers for every finding.
+            Do not report false positives. Every CRITICAL finding must have a specific Fix." \
             2>&1 | tee /tmp/claude_security_report.txt
 
           echo ""
-          echo "═══════════════════════════════════════"
-          echo "  Claude Code Security Audit Report"
-          echo "═══════════════════════════════════════"
+          echo "═══════════════════════════════════════════════"
+          echo "    Claude Code Security Audit — Full Report"
+          echo "═══════════════════════════════════════════════"
           cat /tmp/claude_security_report.txt
           echo ""
 
           if grep -q "AUDIT_RESULT: FAIL" /tmp/claude_security_report.txt; then
-            echo "FAIL: Claude Code identified CRITICAL security issues. See report above."
+            echo "FAIL: Claude Code identified CRITICAL security issues. Full report uploaded as artifact."
             exit 1
           fi
 
           if ! grep -q "AUDIT_RESULT:" /tmp/claude_security_report.txt; then
-            echo "WARNING: Claude Code did not produce a conclusive AUDIT_RESULT. Treating as non-blocking."
+            echo "WARNING: Claude Code did not produce a conclusive AUDIT_RESULT line. Treating as non-blocking."
             exit 0
           fi
 
-          echo "PASS: Claude Code security review completed with no critical findings."
+          echo "PASS: Claude Code security review — no critical findings."
 
       - name: Upload Claude security report as artifact
-        if: always()    # Upload even if the previous step failed
+        if: always()
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
         with:
           name: claude-security-report-${{ github.sha }}
@@ -506,3 +540,340 @@ jobs:
           name: dist-${{ github.sha }}
           path: dist/
           retention-days: 3
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 9: Consolidated security failure report
+  # Always runs (even when other jobs fail). Collects results from every job,
+  # downloads the Claude report artifact, and posts a single actionable markdown
+  # report to the GitHub Actions Step Summary (visible in the Actions UI).
+  # Also uploads the report as a downloadable artifact.
+  # ──────────────────────────────────────────────────────────────────────────────
+  security-report:
+    name: Consolidated security report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Always run — even when dependency jobs fail or are cancelled.
+    if: always()
+    permissions:
+      contents: read
+      actions: read     # Needed to download artifacts from the same run
+    needs:
+      - type-check
+      - lint
+      - axios-ban
+      - secret-scan
+      - dependency-audit
+      - sast
+      - claude-security-review
+      - build-and-artifact
+    steps:
+      # Download the Claude report if it was produced (may not exist if job was skipped/cancelled)
+      - name: Download Claude security report artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444306234e0793febb7db880  # v4.1.8
+        with:
+          name: claude-security-report-${{ github.sha }}
+          path: /tmp/artifacts/claude
+        continue-on-error: true   # Non-fatal if claude job never ran
+
+      - name: Generate consolidated failure report
+        env:
+          RESULT_TYPE_CHECK:     ${{ needs.type-check.result }}
+          RESULT_LINT:           ${{ needs.lint.result }}
+          RESULT_AXIOS_BAN:      ${{ needs.axios-ban.result }}
+          RESULT_SECRET_SCAN:    ${{ needs.secret-scan.result }}
+          RESULT_DEP_AUDIT:      ${{ needs.dependency-audit.result }}
+          RESULT_SAST:           ${{ needs.sast.result }}
+          RESULT_CLAUDE:         ${{ needs.claude-security-review.result }}
+          RESULT_BUILD:          ${{ needs.build-and-artifact.result }}
+          GH_SHA:                ${{ github.sha }}
+          GH_REF:                ${{ github.ref }}
+          GH_ACTOR:              ${{ github.actor }}
+          GH_RUN_ID:             ${{ github.run_id }}
+          GH_SERVER_URL:         ${{ github.server_url }}
+          GH_REPOSITORY:         ${{ github.repository }}
+        run: |
+          REPORT_FILE="/tmp/security-report.md"
+
+          # ── Helpers ──────────────────────────────────────────────────────────
+          icon() {
+            case "$1" in
+              success)   echo "✅" ;;
+              failure)   echo "❌" ;;
+              skipped)   echo "⏭️" ;;
+              cancelled) echo "🚫" ;;
+              *)         echo "❓" ;;
+            esac
+          }
+
+          any_failed=false
+          for r in \
+            "$RESULT_TYPE_CHECK" "$RESULT_LINT" "$RESULT_AXIOS_BAN" \
+            "$RESULT_SECRET_SCAN" "$RESULT_DEP_AUDIT" "$RESULT_SAST" \
+            "$RESULT_CLAUDE" "$RESULT_BUILD"; do
+            [ "$r" = "failure" ] && any_failed=true
+          done
+
+          # ── Report header ─────────────────────────────────────────────────────
+          {
+            echo "# 🔒 Security Pipeline Report"
+            echo ""
+            echo "> **Commit:** \`${GH_SHA:0:8}\` · **Branch:** \`$GH_REF\` · **Author:** @$GH_ACTOR"
+            echo "> **Run:** [$GH_RUN_ID]($GH_SERVER_URL/$GH_REPOSITORY/actions/runs/$GH_RUN_ID)"
+            echo ""
+
+            if [ "$any_failed" = "true" ]; then
+              echo "## ❌ Pipeline FAILED — action required before merge/deploy"
+            else
+              echo "## ✅ All security checks passed"
+            fi
+            echo ""
+
+            # ── Job results table ───────────────────────────────────────────────
+            echo "## Job Results"
+            echo ""
+            echo "| Job | Result | What it checks |"
+            echo "|-----|--------|----------------|"
+            echo "| $(icon $RESULT_TYPE_CHECK) TypeScript type-check | \`$RESULT_TYPE_CHECK\` | Strict TypeScript — catches type errors, unused vars, implicit any |"
+            echo "| $(icon $RESULT_LINT) ESLint | \`$RESULT_LINT\` | Code quality, embedded secrets (high-entropy strings), React safety rules |"
+            echo "| $(icon $RESULT_AXIOS_BAN) Axios ban | \`$RESULT_AXIOS_BAN\` | Confirms axios is absent from source, package manifests, and installed deps |"
+            echo "| $(icon $RESULT_SECRET_SCAN) Secret scanning | \`$RESULT_SECRET_SCAN\` | Full git history (TruffleHog) + working-tree diff (Gitleaks) |"
+            echo "| $(icon $RESULT_DEP_AUDIT) Dependency audit | \`$RESULT_DEP_AUDIT\` | CVE scan (npm audit), license allowlist, lockfile integrity, supply-chain risk |"
+            echo "| $(icon $RESULT_SAST) SAST | \`$RESULT_SAST\` | CodeQL dataflow analysis + Semgrep React/OWASP/XSS rules |"
+            echo "| $(icon $RESULT_CLAUDE) Claude Code review | \`$RESULT_CLAUDE\` | AI security audit — XSS, injection, secrets, OWASP Top 10 |"
+            echo "| $(icon $RESULT_BUILD) Build + artifact scan | \`$RESULT_BUILD\` | Build succeeds, dist/ free of leaked secrets, CSP headers intact |"
+            echo ""
+          } > "$REPORT_FILE"
+
+          # ── Per-job remediation guidance (only for failed jobs) ──────────────
+          if [ "$any_failed" = "true" ]; then
+            {
+              echo "## 🛠️ What to Fix"
+              echo ""
+              echo "> Fix every item below before re-running the pipeline."
+              echo ""
+            } >> "$REPORT_FILE"
+
+            if [ "$RESULT_TYPE_CHECK" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ TypeScript type-check
+
+**Run locally to reproduce:**
+```bash
+npx tsc --noEmit
+```
+**Fix:** Resolve all TypeScript errors reported above. Common causes:
+- Missing or wrong types (`any` assignments, implicit returns)
+- Unused variables or parameters (strict mode enforces this)
+- Missing null checks on potentially-undefined values
+
+SECTION
+            fi
+
+            if [ "$RESULT_LINT" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ ESLint
+
+**Run locally to reproduce:**
+```bash
+npx eslint src/ --ext .ts,.tsx --max-warnings 0
+```
+**Fix:** Address every reported ESLint error. Key security rules enforced:
+- `no-secrets/no-secrets` — remove high-entropy strings that look like credentials
+- `react/no-danger` — do not use `dangerouslySetInnerHTML`
+- `no-eval` / `no-implied-eval` / `no-new-func` — remove all dynamic code execution
+- `no-extend-native` — do not mutate built-in prototypes
+- `react-hooks/rules-of-hooks` — fix hook call order violations
+
+SECTION
+            fi
+
+            if [ "$RESULT_AXIOS_BAN" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ Axios ban
+
+Axios was detected in the codebase. Axios has a known trojan in certain versions of related packages.
+
+**How to fully remove axios:**
+```bash
+# Remove from project
+npm uninstall axios
+
+# Verify it is gone from all locations
+grep -r "axios" package.json package-lock.json src/
+
+# Use the native Fetch API instead:
+# Replace: axios.get(url) → fetch(url).then(r => r.json())
+# Replace: axios.post(url, data) → fetch(url, { method: 'POST', body: JSON.stringify(data) })
+```
+
+SECTION
+            fi
+
+            if [ "$RESULT_SECRET_SCAN" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ Secret scanning (TruffleHog / Gitleaks)
+
+A secret, credential, or high-entropy token was found — either in the current code or in git history.
+
+**Fix steps:**
+1. Identify the exact secret from the scanner output in the job log
+2. **Immediately rotate/revoke** that credential — assume it is compromised
+3. Remove the secret from the file
+4. If the secret is in git history, you must rewrite history:
+   ```bash
+   # Install git-filter-repo (preferred over BFG)
+   pip install git-filter-repo
+
+   # Remove the file or string from all history
+   git filter-repo --path <file-with-secret> --invert-paths
+   # OR for a specific string:
+   git filter-repo --replace-text <(echo 'SECRETVALUE==>REDACTED')
+
+   git push --force-with-lease origin main
+   ```
+5. Use environment variables or GitHub Secrets for all credentials — never hardcode them
+
+SECTION
+            fi
+
+            if [ "$RESULT_DEP_AUDIT" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ Dependency audit
+
+A CVE, license violation, or lockfile inconsistency was detected.
+
+**Run locally to identify the issue:**
+```bash
+# CVE audit
+npm audit
+
+# License check
+npx license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;Unlicense;0BSD"
+
+# Lockfile consistency
+npm ci --dry-run
+```
+
+**Fix:**
+- For CVEs: `npm audit fix` (use `--force` only as last resort — check for breaking changes first)
+- For license violations: replace the offending dependency with a compatible alternative
+- For lockfile drift: run `npm install` then commit the updated `package-lock.json`
+
+SECTION
+            fi
+
+            if [ "$RESULT_SAST" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ SAST (CodeQL / Semgrep)
+
+Static analysis found a security vulnerability in the source code.
+
+**Where to see findings:**
+- CodeQL results: GitHub repo → Security tab → Code scanning alerts
+- Semgrep results: printed in the job log
+
+**Common fixes for this codebase (React/TypeScript PWA):**
+- XSS via `innerHTML`: use `textContent` or React's JSX rendering instead
+- Prototype pollution: validate and sanitize objects from `JSON.parse` before spreading
+- Unsafe regex (ReDoS): avoid backtracking patterns like `(a+)+`
+- `dangerouslySetInnerHTML`: use a sanitizer (e.g. DOMPurify) or restructure the component
+- Unvalidated redirects: always validate URLs against an allowlist before navigating
+
+SECTION
+            fi
+
+            if [ "$RESULT_CLAUDE" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ Claude Code AI security review
+
+Claude identified one or more CRITICAL security issues. See the detailed findings below.
+
+**Fix:** Address every item in the Remediation Checklist in the Claude report section below.
+All CRITICAL findings must be resolved before this job will pass.
+
+SECTION
+            fi
+
+            if [ "$RESULT_BUILD" = "failure" ]; then
+              cat >> "$REPORT_FILE" << 'SECTION'
+### ❌ Build and artifact scan
+
+The build failed, or a secret/forbidden library was detected in the compiled output.
+
+**Possible causes and fixes:**
+
+*Build failure:*
+```bash
+npm run build   # Reproduce locally — fix all tsc and vite errors
+```
+
+*Axios in compiled bundle:*
+```bash
+grep -r "axios" dist/
+# Trace the import and remove it from source
+```
+
+*Leaked secret in bundle:*
+- A `VITE_*` environment variable containing a secret was injected into the bundle
+- Remove it: secrets must NEVER be passed as `VITE_*` env vars (they are embedded in the JS)
+- Use a backend proxy to keep secrets server-side
+
+*CSP regression:*
+- `vercel.json` was modified to weaken the Content-Security-Policy
+- Restore `script-src 'self'` — do not add `'unsafe-inline'` or `'unsafe-eval'`
+
+SECTION
+            fi
+          fi
+
+          # ── Claude detailed report (always append if available) ──────────────
+          if [ -f "/tmp/artifacts/claude/claude_security_report.txt" ]; then
+            {
+              echo ""
+              echo "---"
+              echo ""
+              echo "## 🤖 Claude Code Full Security Report"
+              echo ""
+              echo '```'
+              cat /tmp/artifacts/claude/claude_security_report.txt
+              echo '```'
+            } >> "$REPORT_FILE"
+          fi
+
+          # ── Footer ──────────────────────────────────────────────────────────
+          {
+            echo ""
+            echo "---"
+            echo "*Generated by the security pipeline · $(date -u '+%Y-%m-%d %H:%M UTC')*"
+          } >> "$REPORT_FILE"
+
+          # ── Publish to GitHub Actions Step Summary (visible in the UI) ──────
+          cat "$REPORT_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+          # ── Print to log as well ─────────────────────────────────────────────
+          echo ""
+          cat "$REPORT_FILE"
+
+      - name: Upload consolidated security report as artifact
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+        with:
+          name: security-report-${{ github.sha }}
+          path: /tmp/security-report.md
+          retention-days: 30
+
+      # Fail this job (and thus the overall pipeline status) if any security job failed.
+      # This ensures the GitHub UI shows the pipeline as red, not just individual jobs.
+      - name: Fail if any security job failed
+        if: >
+          needs.type-check.result == 'failure' ||
+          needs.lint.result == 'failure' ||
+          needs.axios-ban.result == 'failure' ||
+          needs.secret-scan.result == 'failure' ||
+          needs.dependency-audit.result == 'failure' ||
+          needs.sast.result == 'failure' ||
+          needs.claude-security-review.result == 'failure' ||
+          needs.build-and-artifact.result == 'failure'
+        run: |
+          echo "One or more security jobs failed. See the report above and in the Step Summary."
+          exit 1
