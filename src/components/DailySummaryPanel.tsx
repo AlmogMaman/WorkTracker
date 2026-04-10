@@ -13,7 +13,10 @@ export function DailySummaryPanel({ date }: Props) {
   const getDailySummary = useAppStore((s) => s.getDailySummary)
   const getDayTotalMinutes = useAppStore((s) => s.getDayTotalMinutes)
   const getTargetForDay = useAppStore((s) => s.getTargetForDay)
+  const toggleDaySync = useAppStore((s) => s.toggleDaySync)
+  const isDaySynced = useAppStore((s) => s.isDaySynced)
   const addToast = useAppStore((s) => s.addToast)
+  const daySynced = isDaySynced(date)
 
   const targetHours = getTargetForDay(date)
 
@@ -119,12 +122,27 @@ export function DailySummaryPanel({ date }: Props) {
                     ? t.summary.targetMet(targetHours)
                     : t.summary.targetMissing(formatDurationMinutes(remaining), targetHours)}
                 </span>
-                <button
-                  onClick={copyToClipboard}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
-                >
-                  {t.summary.copy}
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Day sync toggle */}
+                  <button
+                    onClick={() => toggleDaySync(date)}
+                    title={daySynced ? t.sync.dayNotSynced : t.sync.daySynced}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      daySynced
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${daySynced ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                    {daySynced ? t.sync.daySynced : t.sync.dayNotSynced}
+                  </button>
+                  <button
+                    onClick={copyToClipboard}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    {t.summary.copy}
+                  </button>
+                </div>
               </div>
             </>
           )}

@@ -20,6 +20,8 @@ function createDefault(): AppData {
     projectOrder: [],
     dayTargets: {},
     rangeTargets: [],
+    syncedProjects: {},
+    syncedDays: {},
   }
 }
 
@@ -116,6 +118,29 @@ function validateProjectOrder(raw: unknown): string[] {
     .map((p) => sanitizeProjectName(p))
 }
 
+/** Validate and sanitize syncedProjects. */
+function validateSyncedProjects(raw: unknown): Record<string, string[]> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const result: Record<string, string[]> = {}
+  for (const [date, projects] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
+    if (!Array.isArray(projects)) continue
+    result[date] = projects.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+  }
+  return result
+}
+
+/** Validate and sanitize syncedDays. */
+function validateSyncedDays(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const result: Record<string, boolean> = {}
+  for (const [date, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
+    if (typeof val === 'boolean') result[date] = val
+  }
+  return result
+}
+
 function migrate(raw: unknown): AppData {
   const base = createDefault()
   if (typeof raw !== 'object' || raw === null) return base
@@ -127,6 +152,8 @@ function migrate(raw: unknown): AppData {
     projectOrder: validateProjectOrder(obj.projectOrder),
     dayTargets: validateDayTargets(obj.dayTargets),
     rangeTargets: validateRangeTargets(obj.rangeTargets),
+    syncedProjects: validateSyncedProjects(obj.syncedProjects),
+    syncedDays: validateSyncedDays(obj.syncedDays),
   }
 }
 

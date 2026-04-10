@@ -29,6 +29,8 @@ export type AppData = {
   projectOrder: string[]                 // most-recently-used first, for autocomplete
   dayTargets: Record<string, number>     // "YYYY-MM-DD" -> hours override
   rangeTargets: RangeTarget[]            // date range overrides
+  syncedProjects: Record<string, string[]>  // "YYYY-MM-DD" -> synced project names
+  syncedDays: Record<string, boolean>       // "YYYY-MM-DD" -> day-level synced flag
 }
 
 export type View = 'day' | 'month' | 'settings'

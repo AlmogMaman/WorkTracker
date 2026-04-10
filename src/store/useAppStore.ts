@@ -54,6 +54,13 @@ interface AppStore {
   removeRangeTarget: (id: string) => void
   getTargetForDay: (date: string) => number
 
+  // Sync status
+  toggleProjectSync: (date: string, project: string) => void
+  toggleDaySync: (date: string) => void
+  isProjectSynced: (date: string, project: string) => boolean
+  isDaySynced: (date: string) => boolean
+  isMonthSynced: (yearMonth: string) => boolean
+
   // Data replacement (used by import)
   replaceAllData: (data: AppData) => void
 
@@ -367,6 +374,50 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     // 3. Global setting fallback
     return settings.dailyTargetHours
+  },
+
+  // ── Sync status ─────────────────────────────────────────────────────────────
+
+  toggleProjectSync: (date, project) => {
+    set((prev) => {
+      const syncedProjects = { ...(prev.data.syncedProjects ?? {}) }
+      const current = syncedProjects[date] ?? []
+      if (current.includes(project)) {
+        syncedProjects[date] = current.filter((p) => p !== project)
+      } else {
+        syncedProjects[date] = [...current, project]
+      }
+      const newData = { ...prev.data, syncedProjects }
+      schedulePersist(newData)
+      return { data: newData }
+    })
+  },
+
+  toggleDaySync: (date) => {
+    set((prev) => {
+      const syncedDays = { ...(prev.data.syncedDays ?? {}) }
+      syncedDays[date] = !syncedDays[date]
+      const newData = { ...prev.data, syncedDays }
+      schedulePersist(newData)
+      return { data: newData }
+    })
+  },
+
+  isProjectSynced: (date, project) => {
+    return (get().data.syncedProjects?.[date] ?? []).includes(project)
+  },
+
+  isDaySynced: (date) => {
+    return !!(get().data.syncedDays?.[date])
+  },
+
+  isMonthSynced: (yearMonth) => {
+    const { days, syncedDays } = get().data
+    const daysWithData = Object.keys(days).filter(
+      (d) => d.startsWith(yearMonth) && days[d].length > 0
+    )
+    if (daysWithData.length === 0) return false
+    return daysWithData.every((d) => !!(syncedDays?.[d]))
   },
 
   // ── Data replacement ────────────────────────────────────────────────────────

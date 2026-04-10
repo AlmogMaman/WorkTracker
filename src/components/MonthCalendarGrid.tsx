@@ -20,7 +20,7 @@ interface Props {
 export function MonthCalendarGrid({ yearMonth, onDayClick }: Props) {
   const t = useTranslation()
   const getMonthDayTotals = useAppStore((s) => s.getMonthDayTotals)
-  const targetHours = useAppStore((s) => s.data.settings.dailyTargetHours)
+  const getTargetForDay = useAppStore((s) => s.getTargetForDay)
   const weekStart = useAppStore((s) => s.data.settings.weekStartDay)
 
   const { year, month } = parseYearMonth(yearMonth)
@@ -29,6 +29,7 @@ export function MonthCalendarGrid({ yearMonth, onDayClick }: Props) {
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDow = getFirstDayOfWeek(year, month) // 0=Sun
+
 
   // Shift headers if week starts Monday
   const headers = weekStart === 1
@@ -71,6 +72,7 @@ export function MonthCalendarGrid({ yearMonth, onDayClick }: Props) {
           const today = isToday(dateStr)
           const past = isPast(dateStr) && !today
           const future = isFuture(dateStr)
+          const targetMinutes = getTargetForDay(dateStr) * 60
 
           let dotColor = ''
           if (hasData && totalMins >= targetMinutes) dotColor = 'bg-green-500'

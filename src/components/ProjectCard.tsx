@@ -33,6 +33,9 @@ export function ProjectCard({ project, date }: Props) {
   const deleteBlock = useAppStore((s) => s.deleteBlock)
   const renameProject = useAppStore((s) => s.renameProject)
   const addToast = useAppStore((s) => s.addToast)
+  const toggleProjectSync = useAppStore((s) => s.toggleProjectSync)
+  const isProjectSynced = useAppStore((s) => s.isProjectSynced)
+  const synced = isProjectSynced(date, project)
 
   const commitRename = () => {
     const trimmed = nameValue.trim()
@@ -149,6 +152,15 @@ export function ProjectCard({ project, date }: Props) {
     >
       {/* ── Main row ── */}
       <div className="flex items-center gap-3 px-4 py-3">
+
+        {/* Sync dot */}
+        <button
+          onClick={() => toggleProjectSync(date, project)}
+          title={synced ? t.sync.markUnsynced : t.sync.markSynced}
+          className={`w-3 h-3 rounded-full shrink-0 transition-all focus:outline-none ${
+            synced ? 'bg-green-500 hover:bg-green-400' : 'bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500'
+          }`}
+        />
 
         {/* Running indicator */}
         <div className={`w-3 h-3 rounded-full shrink-0 transition-all ${isActive ? 'bg-blue-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-600'}`} />

@@ -127,6 +127,14 @@ const en = {
   calendar: {
     dayHeaders: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as string[],
   },
+  sync: {
+    markSynced: 'Mark as synced',
+    markUnsynced: 'Mark as unsynced',
+    daySynced: 'Day synced',
+    dayNotSynced: 'Day not synced',
+    monthSynced: 'All days synced',
+    monthPartial: 'Partially synced',
+  },
 }
 
 const he: typeof en = {
@@ -255,6 +263,14 @@ const he: typeof en = {
   },
   calendar: {
     dayHeaders: ["א'", "ב'", "ג'", "ד'", "ה'", "ו'", 'שב'],
+  },
+  sync: {
+    markSynced: 'סמן כמסונכרן',
+    markUnsynced: 'בטל סימון סינכרון',
+    daySynced: 'יום מסונכרן',
+    dayNotSynced: 'יום לא מסונכרן',
+    monthSynced: 'כל הימים מסונכרנים',
+    monthPartial: 'מסונכרן חלקית',
   },
 }
 
