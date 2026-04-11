@@ -25,7 +25,6 @@ export function MonthCalendarGrid({ yearMonth, onDayClick }: Props) {
 
   const { year, month } = parseYearMonth(yearMonth)
   const dayTotals = getMonthDayTotals(yearMonth)
-  const targetMinutes = targetHours * 60
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDow = getFirstDayOfWeek(year, month) // 0=Sun
