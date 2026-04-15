@@ -10,6 +10,8 @@ const defaultSettings: AppSettings = {
   weekStartDay: 0,
   timeFormat: '24h',
   language: 'en',
+  // Sun=9, Mon=9, Tue=9, Wed=9, Thu=8, Fri=9, Sat=9 — 0 means "day off"
+  dayOfWeekTargets: [9, 9, 9, 9, 8, 9, 9],
 }
 
 function createDefault(): AppData {
@@ -74,6 +76,12 @@ function validateSettings(raw: unknown): AppSettings {
   }
   if (obj.language === 'en' || obj.language === 'he') {
     base.language = obj.language as Lang
+  }
+  if (Array.isArray(obj.dayOfWeekTargets) && obj.dayOfWeekTargets.length === 7) {
+    const validated = obj.dayOfWeekTargets.map((h) =>
+      typeof h === 'number' ? Math.max(0, Math.min(24, h)) : defaultSettings.dayOfWeekTargets[0]
+    )
+    base.dayOfWeekTargets = validated
   }
   return base
 }

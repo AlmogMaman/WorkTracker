@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type { AppData, AppSettings, RangeTarget, Toast, View, WorkBlock } from '../types'
 import { loadData, sanitizeProjectName, saveData } from '../utils/storage'
-import { nowHHMM, parseDurationMinutes, parseDurationSeconds, todayStr } from '../utils/time'
+import { getDayOfWeek, nowHHMM, parseDurationMinutes, parseDurationSeconds, todayStr } from '../utils/time'
 
 // ─── Debounced persist ────────────────────────────────────────────────────────
 
@@ -372,7 +372,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     for (const r of (rangeTargets ?? [])) {
       if (date >= r.from && date <= r.to) return r.hours
     }
-    // 3. Global setting fallback
+    // 3. Day-of-week target (e.g. Thu=8, Fri/Sat=0 for day off)
+    const dow = getDayOfWeek(date)
+    const dowTargets = settings.dayOfWeekTargets
+    if (dowTargets && dowTargets[dow] !== undefined) return dowTargets[dow]
+    // 4. Global setting fallback
     return settings.dailyTargetHours
   },
 

@@ -135,6 +135,11 @@ const en = {
     monthSynced: 'All days synced',
     monthPartial: 'Partially synced',
   },
+  balance: {
+    overtime: (dur: string) => `+${dur} overtime`,
+    deficit: (dur: string) => `-${dur} behind`,
+    onTrack: 'On track',
+  },
 }
 
 const he: typeof en = {
@@ -271,6 +276,11 @@ const he: typeof en = {
     dayNotSynced: 'יום לא מסונכרן',
     monthSynced: 'כל הימים מסונכרנים',
     monthPartial: 'מסונכרן חלקית',
+  },
+  balance: {
+    overtime: (dur: string) => `+${dur} שעות נוספות`,
+    deficit: (dur: string) => `-${dur} חסר`,
+    onTrack: 'בדיוק ביעד',
   },
 }
 

@@ -13,6 +13,8 @@ export type AppSettings = {
   weekStartDay: 0 | 1   // 0 = Sunday, 1 = Monday
   timeFormat: '24h' | '12h'
   language: Lang
+  // Per-day-of-week targets: index 0=Sun … 6=Sat. Value 0 means "day off / no target".
+  dayOfWeekTargets: number[]
 }
 
 export type RangeTarget = {

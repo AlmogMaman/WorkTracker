@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useTranslation } from '../i18n/useTranslation'
-import { addMonths, currentYearMonth, formatDateLabel, formatDurationMinutes, formatMonthLabel } from '../utils/time'
+import { addMonths, currentYearMonth, dateToStr, formatDateLabel, formatDurationMinutes, formatMonthLabel, getDaysInMonth, parseYearMonth, todayStr } from '../utils/time'
 import { MonthCalendarGrid } from './MonthCalendarGrid'
 import { MonthSummaryTable } from './MonthSummaryTable'
 
@@ -18,6 +18,24 @@ export function MonthView() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth)
   const [popup, setPopup] = useState<string | null>(null) // date string
   const monthSynced = isMonthSynced(yearMonth)
+
+  // ── Month balance (overtime / deficit) ──────────────────────────────────────
+  // Sum (actual - target) for every past/today day in the viewed month.
+  // Days off (target = 0) still count if you worked on them (positive delta).
+  const monthBalanceMinutes = (() => {
+    const today = todayStr()
+    const { year, month } = parseYearMonth(yearMonth)
+    const daysInMonth = getDaysInMonth(year, month)
+    let delta = 0
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = dateToStr(new Date(year, month, day))
+      if (dateStr > today) break
+      const targetMins = getTargetForDay(dateStr) * 60
+      const actualMins = getDayTotalMinutes(dateStr)
+      delta += actualMins - targetMins
+    }
+    return delta
+  })()
 
   const prev = () => setYearMonth((ym) => addMonths(ym, -1))
   const next = () => setYearMonth((ym) => addMonths(ym, 1))
@@ -54,17 +72,38 @@ export function MonthView() {
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 min-w-[220px] text-center">
             {formatMonthLabel(yearMonth, t.locale)}
           </h2>
-          {/* Month sync badge */}
-          <span
-            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-              monthSynced
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${monthSynced ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-500'}`} />
-            {monthSynced ? t.sync.monthSynced : t.sync.monthPartial}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            {/* Month overtime / deficit badge */}
+            {monthBalanceMinutes !== 0 && (
+              <span
+                className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  monthBalanceMinutes > 0
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                }`}
+              >
+                {monthBalanceMinutes > 0
+                  ? t.balance.overtime(formatDurationMinutes(monthBalanceMinutes))
+                  : t.balance.deficit(formatDurationMinutes(Math.abs(monthBalanceMinutes)))}
+              </span>
+            )}
+            {monthBalanceMinutes === 0 && (
+              <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500">
+                {t.balance.onTrack}
+              </span>
+            )}
+            {/* Month sync badge */}
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                monthSynced
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  : 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${monthSynced ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-500'}`} />
+              {monthSynced ? t.sync.monthSynced : t.sync.monthPartial}
+            </span>
+          </div>
         </div>
         <button
           onClick={next}
