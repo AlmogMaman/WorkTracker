@@ -12,12 +12,19 @@ export function MonthView() {
   const getDailySummary = useAppStore((s) => s.getDailySummary)
   const getDayTotalMinutes = useAppStore((s) => s.getDayTotalMinutes)
   const getTargetForDay = useAppStore((s) => s.getTargetForDay)
-  const isMonthSynced = useAppStore((s) => s.isMonthSynced)
   const toggleDaySync = useAppStore((s) => s.toggleDaySync)
-  const isDaySynced = useAppStore((s) => s.isDaySynced)
+  // Reactive sync selectors — read data directly so Zustand re-renders on change
+  const syncedDays = useAppStore((s) => s.data.syncedDays)
+  const daysData = useAppStore((s) => s.data.days)
   const [yearMonth, setYearMonth] = useState(currentYearMonth)
   const [popup, setPopup] = useState<string | null>(null) // date string
-  const monthSynced = isMonthSynced(yearMonth)
+  const monthSynced = (() => {
+    const daysWithData = Object.keys(daysData).filter(
+      (d) => d.startsWith(yearMonth) && daysData[d].length > 0
+    )
+    if (daysWithData.length === 0) return false
+    return daysWithData.every((d) => !!(syncedDays?.[d]))
+  })()
 
   // ── Month balance (overtime / deficit) ──────────────────────────────────────
   // Sum (actual - target) for every past/today day in the viewed month.
@@ -56,7 +63,7 @@ export function MonthView() {
   const popupTotal = popup ? getDayTotalMinutes(popup) : 0
   const popupTarget = popup ? getTargetForDay(popup) : 0
   const popupMet = popupTotal >= popupTarget * 60
-  const popupDaySynced = popup ? isDaySynced(popup) : false
+  const popupDaySynced = popup ? !!(syncedDays?.[popup]) : false
 
   return (
     <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-8 flex flex-col gap-4 sm:gap-6">

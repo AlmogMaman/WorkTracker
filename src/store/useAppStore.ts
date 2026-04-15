@@ -372,10 +372,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     for (const r of (rangeTargets ?? [])) {
       if (date >= r.from && date <= r.to) return r.hours
     }
-    // 3. Day-of-week target (e.g. Thu=8, Fri/Sat=0 for day off)
+    // 3. Day-of-week target (Thu=8, Fri=0/off, Sat=0/off, else 9)
     const dow = getDayOfWeek(date)
     const dowTargets = settings.dayOfWeekTargets
-    if (dowTargets && dowTargets[dow] !== undefined) return dowTargets[dow]
+    if (Array.isArray(dowTargets) && dowTargets[dow] !== undefined) return dowTargets[dow]
     // 4. Global setting fallback
     return settings.dailyTargetHours
   },

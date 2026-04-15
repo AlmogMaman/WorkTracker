@@ -34,8 +34,7 @@ export function ProjectCard({ project, date }: Props) {
   const renameProject = useAppStore((s) => s.renameProject)
   const addToast = useAppStore((s) => s.addToast)
   const toggleProjectSync = useAppStore((s) => s.toggleProjectSync)
-  const isProjectSynced = useAppStore((s) => s.isProjectSynced)
-  const synced = isProjectSynced(date, project)
+  const synced = useAppStore((s) => (s.data.syncedProjects?.[date] ?? []).includes(project))
 
   const commitRename = () => {
     const trimmed = nameValue.trim()

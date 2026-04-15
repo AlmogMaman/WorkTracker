@@ -14,9 +14,8 @@ export function DailySummaryPanel({ date }: Props) {
   const getDayTotalMinutes = useAppStore((s) => s.getDayTotalMinutes)
   const getTargetForDay = useAppStore((s) => s.getTargetForDay)
   const toggleDaySync = useAppStore((s) => s.toggleDaySync)
-  const isDaySynced = useAppStore((s) => s.isDaySynced)
   const addToast = useAppStore((s) => s.addToast)
-  const daySynced = isDaySynced(date)
+  const daySynced = useAppStore((s) => !!(s.data.syncedDays?.[date]))
 
   const targetHours = getTargetForDay(date)
 

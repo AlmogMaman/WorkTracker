@@ -10,8 +10,8 @@ const defaultSettings: AppSettings = {
   weekStartDay: 0,
   timeFormat: '24h',
   language: 'en',
-  // Sun=9, Mon=9, Tue=9, Wed=9, Thu=8, Fri=9, Sat=9 — 0 means "day off"
-  dayOfWeekTargets: [9, 9, 9, 9, 8, 9, 9],
+  // Sun=9, Mon=9, Tue=9, Wed=9, Thu=8, Fri=0 (off), Sat=0 (off)
+  dayOfWeekTargets: [9, 9, 9, 9, 8, 0, 0],
 }
 
 function createDefault(): AppData {
