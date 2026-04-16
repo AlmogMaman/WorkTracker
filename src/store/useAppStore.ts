@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type { AppData, AppSettings, RangeTarget, Toast, View, WorkBlock } from '../types'
 import { loadData, sanitizeProjectName, saveData } from '../utils/storage'
-import { getDayOfWeek, nowHHMM, parseDurationMinutes, parseDurationSeconds, todayStr } from '../utils/time'
+import { getDayOfWeek, nowHHMM, parseDurationSeconds, todayStr } from '../utils/time'
 
 // ─── Debounced persist ────────────────────────────────────────────────────────
 
