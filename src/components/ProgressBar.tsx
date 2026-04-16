@@ -31,9 +31,10 @@ export function ProgressBar({ date }: Props) {
   const hasCustom = dayTargets?.[date] !== undefined
   const totalMinutes = getDayTotalMinutes(date)
   const targetMinutes = targetHours * 60
-  const pct = Math.min(100, Math.round((totalMinutes / targetMinutes) * 100))
-  const met = totalMinutes >= targetMinutes
-  const remaining = targetMinutes - totalMinutes
+  const isDayOff = targetMinutes === 0
+  const pct = isDayOff ? 0 : Math.min(100, Math.round((totalMinutes / targetMinutes) * 100))
+  const met = isDayOff ? true : totalMinutes >= targetMinutes
+  const remaining = isDayOff ? 0 : targetMinutes - totalMinutes
 
   const openEdit = () => {
     setEditValue(String(targetHours))
@@ -43,7 +44,7 @@ export function ProgressBar({ date }: Props) {
 
   const commitEdit = () => {
     const v = parseFloat(editValue)
-    if (!isNaN(v) && v >= 0.5 && v <= 24) {
+    if (!isNaN(v) && v >= 0 && v <= 24) {
       setDayTarget(date, v)
     }
     setEditing(false)
@@ -89,7 +90,11 @@ export function ProgressBar({ date }: Props) {
           )}
         </div>
 
-        {met ? (
+        {isDayOff ? (
+          <span className="text-sm font-medium text-gray-400 dark:text-gray-500">
+            {totalMinutes > 0 ? `+${formatDurationMinutes(totalMinutes)}` : '—'}
+          </span>
+        ) : met ? (
           <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600 dark:text-green-400">
             <span className="text-base">✓</span>
             {t.progress.done}
@@ -110,7 +115,7 @@ export function ProgressBar({ date }: Props) {
           <input
             ref={inputRef}
             type="number"
-            min={0.5}
+            min={0}
             max={24}
             step={0.5}
             value={editValue}
@@ -145,17 +150,20 @@ export function ProgressBar({ date }: Props) {
         </div>
       )}
 
-      {/* Progress bar */}
-      <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            met ? 'bg-green-500' : pct > 75 ? 'bg-yellow-400' : 'bg-blue-500'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      <div className="mt-1 text-right rtl:text-left text-xs text-gray-400 dark:text-gray-500">{pct}%</div>
+      {/* Progress bar — hidden when target is 0 (day off) */}
+      {!isDayOff && (
+        <>
+          <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                met ? 'bg-green-500' : pct > 75 ? 'bg-yellow-400' : 'bg-blue-500'
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <div className="mt-1 text-right rtl:text-left text-xs text-gray-400 dark:text-gray-500">{pct}%</div>
+        </>
+      )}
     </div>
   )
 }

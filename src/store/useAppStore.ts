@@ -133,10 +133,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!running) return null
 
     const { block, date } = running
+    const now = Date.now()
     set((prev) => {
       const days = { ...prev.data.days }
       days[date] = days[date].map((b) =>
-        b.id === block.id ? { ...b, endTime: nowHHMM() } : b,
+        b.id === block.id ? { ...b, endTime: nowHHMM(), endTimestamp: now } : b,
       )
       const newData = { ...prev.data, days }
       schedulePersist(newData)
@@ -148,9 +149,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateBlock: (date, id, changes) => {
     // Sanitize project name if provided
-    const safeChanges = changes.project !== undefined
+    let safeChanges = changes.project !== undefined
       ? { ...changes, project: sanitizeProjectName(changes.project) }
       : changes
+    // Clear timestamps when times are manually edited — stale ms values would give wrong durations
+    if (safeChanges.startTime !== undefined || safeChanges.endTime !== undefined) {
+      safeChanges = { ...safeChanges, startTimestamp: undefined, endTimestamp: undefined }
+    }
 
     set((prev) => {
       const days = { ...prev.data.days }
@@ -203,15 +208,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   getDayTotalMinutes: (date) => {
     const blocks = get().getDayBlocks(date)
     return blocks.reduce((sum, b) => {
-      const mins = parseDurationMinutes(b.startTime, b.endTime)
-      return sum + Math.max(0, mins)
+      const secs = parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)
+      return sum + Math.max(0, Math.floor(secs / 60))
     }, 0)
   },
 
   getDayTotalSeconds: (date) => {
     const blocks = get().getDayBlocks(date)
     return blocks.reduce((sum, b) => {
-      const secs = parseDurationSeconds(b.startTime, b.endTime)
+      const secs = parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)
       return sum + Math.max(0, secs)
     }, 0)
   },
@@ -220,7 +225,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const blocks = get().getDayBlocks(date)
     const totals: Record<string, number> = {}
     for (const b of blocks) {
-      const mins = parseDurationMinutes(b.startTime, b.endTime)
+      const secs = parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)
+      const mins = Math.floor(secs / 60)
       if (mins > 0) {
         const key = b.project.trim() || '(no project)'
         totals[key] = (totals[key] ?? 0) + mins
@@ -236,7 +242,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     for (const [date, blocks] of Object.entries(get().data.days)) {
       if (!date.startsWith(yearMonth)) continue
       for (const b of blocks) {
-        const mins = parseDurationMinutes(b.startTime, b.endTime)
+        const secs = parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)
+        const mins = Math.floor(secs / 60)
         if (mins > 0) {
           const key = b.project.trim() || '(no project)'
           totals[key] = (totals[key] ?? 0) + mins
@@ -253,8 +260,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     for (const [date, blocks] of Object.entries(get().data.days)) {
       if (!date.startsWith(yearMonth)) continue
       result[date] = blocks.reduce((sum, b) => {
-        const mins = parseDurationMinutes(b.startTime, b.endTime)
-        return sum + Math.max(0, mins)
+        const secs = parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)
+        return sum + Math.max(0, Math.floor(secs / 60))
       }, 0)
     }
     return result
@@ -332,7 +339,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       if (hours === null) {
         delete dayTargets[date]
       } else {
-        dayTargets[date] = Math.max(0.5, Math.min(24, hours))
+        dayTargets[date] = Math.max(0, Math.min(24, hours))
       }
       const newData = { ...prev.data, dayTargets }
       schedulePersist(newData)

@@ -92,7 +92,7 @@ function validateDayTargets(raw: unknown): Record<string, number> {
   const result: Record<string, number> = {}
   for (const [date, hours] of Object.entries(raw as Record<string, unknown>)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
-    if (typeof hours !== 'number' || hours < 0.5 || hours > 24) continue
+    if (typeof hours !== 'number' || hours < 0 || hours > 24) continue
     result[date] = hours
   }
   return result

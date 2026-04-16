@@ -59,9 +59,22 @@ export function formatMonthLabel(yearMonth: string, locale = 'en-US'): string {
   return d.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
 }
 
-/** Returns duration in seconds. Uses current time if endTime is null. */
-export function parseDurationSeconds(startTime: string, endTime: string | null): number {
-  const now = new Date()
+/** Returns duration in seconds. Uses ms timestamps for precision when available. */
+export function parseDurationSeconds(
+  startTime: string,
+  endTime: string | null,
+  startTimestamp?: number,
+  endTimestamp?: number,
+): number {
+  // Completed block with both timestamps: exact ms precision
+  if (endTime !== null && startTimestamp && endTimestamp) {
+    return Math.max(0, Math.floor((endTimestamp - startTimestamp) / 1000))
+  }
+  // Running block with startTimestamp: exact ms precision
+  if (endTime === null && startTimestamp) {
+    return Math.max(0, Math.floor((Date.now() - startTimestamp) / 1000))
+  }
+  // Fallback: HH:MM string math (minute-level precision)
   const [sh, sm] = startTime.split(':').map(Number)
   const startSec = sh * 3600 + sm * 60
   let endSec: number
@@ -69,14 +82,20 @@ export function parseDurationSeconds(startTime: string, endTime: string | null):
     const [eh, em] = endTime.split(':').map(Number)
     endSec = eh * 3600 + em * 60
   } else {
+    const now = new Date()
     endSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()
   }
   return Math.max(0, endSec - startSec)
 }
 
-/** Returns duration in minutes (kept for backward compat with summaries). */
-export function parseDurationMinutes(startTime: string, endTime: string | null): number {
-  return Math.floor(parseDurationSeconds(startTime, endTime) / 60)
+/** Returns duration in minutes. Passes timestamps through for second-level precision. */
+export function parseDurationMinutes(
+  startTime: string,
+  endTime: string | null,
+  startTimestamp?: number,
+  endTimestamp?: number,
+): number {
+  return Math.floor(parseDurationSeconds(startTime, endTime, startTimestamp, endTimestamp) / 60)
 }
 
 /** Format seconds as "Xh Ym Zs" for completed blocks. */

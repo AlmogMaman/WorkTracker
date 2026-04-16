@@ -66,7 +66,7 @@ export function ProjectCard({ project, date }: Props) {
   // ── Totals ───────────────────────────────────────────────────────────────────
   const completedSeconds = blocks
     .filter((b) => b.endTime !== null)
-    .reduce((sum, b) => sum + Math.max(0, parseDurationSeconds(b.startTime, b.endTime)), 0)
+    .reduce((sum, b) => sum + Math.max(0, parseDurationSeconds(b.startTime, b.endTime, b.startTimestamp, b.endTimestamp)), 0)
 
   const liveSeconds = isRunning
     ? liveElapsedSeconds(runningBlock!.startTime, runningBlock!.startTimestamp)
@@ -261,7 +261,7 @@ export function ProjectCard({ project, date }: Props) {
             <p className="text-sm text-gray-400 dark:text-gray-500 py-1">{t.project.noBlocks}</p>
           ) : (
             sortedBlocks.map((block) => {
-              const blockSecs = parseDurationSeconds(block.startTime, block.endTime)
+              const blockSecs = parseDurationSeconds(block.startTime, block.endTime, block.startTimestamp, block.endTimestamp)
               const blockIsRunning = block.endTime === null
               return (
                 <div

@@ -2,8 +2,9 @@ export type WorkBlock = {
   id: string
   project: string
   startTime: string        // "HH:MM" 24-hour — used for display and storage
-  startTimestamp?: number  // Date.now() ms — used for live timer accuracy
+  startTimestamp?: number  // Date.now() ms — used for second-level accuracy
   endTime: string | null   // null = timer is running
+  endTimestamp?: number    // Date.now() ms — set when timer is stopped; cleared if block is manually edited
 }
 
 export type Lang = 'en' | 'he'
