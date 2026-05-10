@@ -31,7 +31,6 @@ export function ProjectCard({ project, date }: Props) {
   const stopRunningBlock = useAppStore((s) => s.stopRunningBlock)
   const updateBlock = useAppStore((s) => s.updateBlock)
   const deleteBlock = useAppStore((s) => s.deleteBlock)
-  const renameProject = useAppStore((s) => s.renameProject)
   const addToast = useAppStore((s) => s.addToast)
   const toggleProjectSync = useAppStore((s) => s.toggleProjectSync)
   const synced = useAppStore((s) => (s.data.syncedProjects?.[date] ?? []).includes(project))
@@ -39,7 +38,8 @@ export function ProjectCard({ project, date }: Props) {
   const commitRename = () => {
     const trimmed = nameValue.trim()
     if (trimmed && trimmed !== project) {
-      renameProject(project, trimmed)
+      // Only rename blocks on THIS date — not historical blocks across all days
+      blocks.forEach((b) => updateBlock(date, b.id, { project: trimmed }))
       addToast(t.settings.renamed(project, trimmed), 'success')
     }
     setEditingName(false)
